@@ -12,6 +12,7 @@ import sys
 import os
 import hashlib
 import shutil
+import pickle
 
 if (len(sys.argv) != 3):
     print 'Usage: ' + sys.argv[0] + ' <new_image_directory> <main_image_directory>'
@@ -29,19 +30,34 @@ os.makedirs(todoDirectory)
 
 # Hash files we already have
 fileHashes = {}
+
+# If we already hashed the existing files, load from the hash
+savedHashFilename = os.path.join(outputDirectory, '.photosort')
+if os.path.exists(savedHashFilename):
+    with open(savedHashFilename, 'rb') as savedFile:
+        fileHashes = pickle.load(savedFile)
+
+# Hash new files
 for root, dirs, files in os.walk(outputDirectory):
     for filename in files:
+        if filename.startswith('.'):
+            continue
         fullName = os.path.join(root, filename)
-        fileHashes[hashlib.md5(open(fullName).read()).hexdigest()] = fullName
+        if fullName not in fileHashes.values():
+            fileHashes[hashlib.md5(open(fullName).read()).hexdigest()] = fullName
+
+# Save our hash so we don't have to do it again
+with open(savedHashFilename, 'wb') as savedFile:
+    pickle.dump(fileHashes, savedFile)
 
 for root, dirs, files in os.walk(inputDirectory):
     for filename in files:
+        if filename.startswith('.'):
+            continue
         fullName = os.path.join(root, filename)
         fileHash = hashlib.md5(open(fullName).read()).hexdigest()
         if (fileHash in fileHashes):
             print fullName.ljust(50) + ' Already exists as ' + fileHashes[fileHash]
-        elif (filename.startswith('.')):
-            print fullName.ljust(50) + ' Starts with "."; skipping.'
         else:
             print fullName.ljust(45) + ' NEW'
             shutil.copy2(fullName, os.path.join(todoDirectory, filename))
